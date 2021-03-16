@@ -1,2 +1,4 @@
 let () = 
-  print_endline "hello, world"
+  let line = input_line stdin in
+    print_endline line
+
