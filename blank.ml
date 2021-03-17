@@ -5,6 +5,7 @@ type token =
     | Space
     | Tab
     | LineFeed
+    | EOF
 
 (* Get the input filename *)
 let get_filename =
