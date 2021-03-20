@@ -34,15 +34,14 @@ let char_to_token c =
 (* Scan tokens from a line *)
 let scan_line line = 
     let chars = List.init (String.length line) ~f:(String.get line) in
-    List.iter chars ~f:(fun c -> print_token (char_to_token c))
+        List.map chars ~f:(fun c -> char_to_token c)
 
 (* Scan a list of tokens from a list of lines *)
 let scan lines = 
-    List.iter lines ~f:scan_line
+    let tokens = List.concat (List.map lines ~f:scan_line) in
+        List.iter tokens ~f:(fun token -> print_token token)
 
 let () =
     match get_filename with
-    | Some filename ->
-        let lines = read_lines filename in
-            scan lines
+    | Some filename -> scan (read_lines filename)
     | None -> print_endline "usage: blank FILENAME"
