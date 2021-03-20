@@ -7,7 +7,7 @@ type token =
     | LineFeed
     | EOF
 
-    (* Print the string representation of a token *)
+(* Print the string representation of a token *)
 let print_token token =
     match token with
     | Space -> print_endline "Space"
