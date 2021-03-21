@@ -7,5 +7,7 @@ let get_filename =
 
 let () =
     match get_filename with
-    | Some filename -> Parse.scan (In_channel.read_all filename)
+    | Some filename ->
+        let tokens = Parse.scan (In_channel.read_all filename) in
+          List.iter tokens ~f:(fun token -> Parse.print_token token)
     | None -> print_endline "usage: blank FILENAME"
