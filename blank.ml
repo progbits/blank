@@ -7,6 +7,51 @@ type token =
     | LineFeed
     | EOF
 
+(* Stack manipulation instructions *)
+type stack_manipulation =
+    | Push of int 
+    | Duplicate
+    | Swap
+    | Discard
+
+(* Arithmetic instructions *)
+type arithmetic = 
+    | Addtion of int * int
+    | Subtraction of int * int
+    | Multiplication of int * int
+    | Division of int * int
+    | Modulo of int * int
+
+(* Heap access instructions *)
+type heap_acces =
+    | Store
+    | Retrieve
+
+(* Flow control instructions *)
+type flow_control =
+    | Mark of int
+    | Call of int
+    | UnconditionalJump of int
+    | JumpZero of int
+    | JumpNegative of int
+    | EndSubroutine
+    | EndProgram
+
+(* IO instructions *)
+type io = 
+    | OutputCharacter
+    | OutputNumber
+    | ReadCharacter
+    | ReadNumber
+
+(* Instruction modification parameters *)
+type imp =
+    | StackManipulation of stack_manipulation
+    | Arithmetic of arithmetic
+    | HeapAccess of heap_acces
+    | FlowControl of flow_control
+    | IO of io
+
 (* Print the string representation of a token *)
 let print_token token =
     match token with
