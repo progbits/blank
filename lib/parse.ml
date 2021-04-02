@@ -77,3 +77,51 @@ let parse_stack_imp tokens =
   | LineFeed :: _ -> Discard
   | _ ->
       raise (Invalid_argument "unknown stack instruction modification parameter")
+
+(* Parse Arithmetic Instruction Modification Parameter*)
+let parse_arithmetic_imp tokens =
+  match tokens with
+  | Space :: Space :: _ -> Addtion
+  | Space :: Tab :: _ -> Subtraction
+  | Space :: LineFeed :: _ -> Multiplication
+  | Tab :: Space :: _ -> Division
+  | Tab :: Tab :: _ -> Modulo
+  | _ ->
+      raise
+        (Invalid_argument
+           "unknown arithmetic instruction modification parameter" )
+
+(* Parse Heap Access Instruction Modification Parameter*)
+let parse_heap_imp tokens =
+  match tokens with
+  | Space :: _ -> Store
+  | Tab :: _ -> Retrieve
+  | _ ->
+      raise
+        (Invalid_argument
+           "unknown heap access instruction modification parameter" )
+
+(* Parse Flow Control Instruction Modification Parameter*)
+let parse_flow_control_imp tokens =
+  match tokens with
+  | Space :: Space :: t -> Mark (fst (parse_number t))
+  | Space :: Tab :: t -> Call (fst (parse_number t))
+  | Space :: LineFeed :: t -> UnconditionalJump (fst (parse_number t))
+  | Tab :: Space :: t -> JumpZero (fst (parse_number t))
+  | Tab :: Tab :: t -> JumpNegative (fst (parse_number t))
+  | Tab :: LineFeed :: _ -> EndSubroutine
+  | LineFeed :: LineFeed :: _ -> EndProgram
+  | _ ->
+      raise
+        (Invalid_argument
+           "unknown heap access instruction modification parameter" )
+
+(* Parse I/O Instruction Modification Parameter*)
+let parse_io_imp tokens =
+  match tokens with
+  | Space :: Space :: _ -> OutputCharacter
+  | Space :: Tab :: _ -> OutputNumber
+  | Tab :: Space :: _ -> ReadCharacter
+  | Tab :: Tab :: _ -> ReadNumber
+  | _ ->
+      raise (Invalid_argument "unknown i/o instruction modification parameter")
