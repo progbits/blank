@@ -7,12 +7,7 @@ type token = Space | Tab | LineFeed | EOF
 type stack_manipulation = Push of int | Duplicate | Swap | Discard
 
 (* Arithmetic instructions *)
-type arithmetic =
-  | Addtion of int * int
-  | Subtraction of int * int
-  | Multiplication of int * int
-  | Division of int * int
-  | Modulo of int * int
+type arithmetic = Addtion | Subtraction | Multiplication | Division | Modulo
 
 (* Heap access instructions *)
 type heap_acces = Store | Retrieve
