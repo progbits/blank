@@ -58,3 +58,27 @@ let char_to_token c =
 let scan input =
   let chars = List.init (String.length input) ~f:(String.get input) in
   List.map chars ~f:(fun c -> char_to_token c)
+
+(* Parse a number *)
+let rec parse_number tokens =
+  match tokens with
+  | LineFeed :: _ -> (0, 0)
+  | Space :: t ->
+      let result = parse_number t in
+      let pos = snd result in
+      (fst result, pos + 1)
+  | Tab :: t ->
+      let result = parse_number t in
+      let pos = snd result in
+      (fst result + (1 lsl pos), pos + 1)
+  | _ -> raise (Invalid_argument "unexpected token")
+
+(* Parse Stack Manipulation Instruction Modification Parameter*)
+let parse_stack_imp tokens =
+  match tokens with
+  | Space :: t -> Push (fst (parse_number t))
+  | Tab :: Space :: _ -> Duplicate
+  | Tab :: Tab :: _ -> Swap
+  | LineFeed :: _ -> Discard
+  | _ ->
+      raise (Invalid_argument "unknown stack instruction modification parameter")
