@@ -9,5 +9,6 @@ let () =
   | Some filename ->
       let tokens = Parse.scan (In_channel.read_all filename) in
       let instructions = Parse.parse tokens in
-      Stream.iter Parse.print_imp instructions
+      let _ = Parse.run instructions in
+      ()
   | None -> print_endline "usage: blank FILENAME"

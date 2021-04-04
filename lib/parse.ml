@@ -49,6 +49,12 @@ let print_imp instruction =
   | FlowControl _ -> print_endline "FlowControl"
   | IO _ -> print_endline "IO"
 
+let print_top_of_stack stack =
+  let dup = Stack.copy stack in
+  match Stack.pop dup with
+  | Some value -> printf "%d\n" value
+  | None -> print_endline "nothing there"
+
 (* Convert a char to a token *)
 let char_to_token c =
   match c with
@@ -148,7 +154,7 @@ let parse_io_imp tokens =
     | _ -> raise (Invalid_argument "unexpected token") )
   | _ -> raise (Invalid_argument "unknown i/o imp")
 
-(* Parse a stream of tokens into an instruction stream *)
+(* Parse a stream of tokens into a list of instructions *)
 let parse tokens =
   let rec loop acc =
     try
@@ -161,7 +167,196 @@ let parse tokens =
         | LineFeed -> loop (IO (parse_io_imp tokens) :: acc)
         | _ -> raise (Invalid_argument "unexpected token") )
       | LineFeed -> loop (FlowControl (parse_flow_control_imp tokens) :: acc)
-      | EOF | (exception Stream.Failure) -> Stream.of_list (List.rev acc)
-    with Stream.Failure -> Stream.of_list (List.rev acc)
+      | EOF | (exception Stream.Failure) -> List.rev acc
+    with Stream.Failure -> List.rev acc
   in
   loop []
+
+exception RuntimeError of string
+
+(* Virtual machine state *)
+type state = {stack: int Stack.t; heap: Buffer.t; ip: int}
+
+let incriment_ip state = {stack= state.stack; heap= state.heap; ip= state.ip + 1}
+
+let update_ip state ip = {stack= state.stack; heap= state.heap; ip}
+
+(* Execute a StackManipulation command and return the new state *)
+let exec_stack_manipulation command state =
+  (*print_endline "exec_stack_manipulation" ;*)
+  match command with
+  | Push value ->
+      (*printf "PUSH %d \n" value ;*)
+      Stack.push state.stack value ;
+      (* printf "STACK SIZE %d \n" (Stack.length state.stack) ; *)
+      incriment_ip state
+  | Duplicate -> (
+    (* printf "TRY DUPLICATE\n" ; *)
+    match Stack.pop state.stack with
+    | Some value ->
+        (* printf "DUPLICATE %d\n" value ; *)
+        Stack.push state.stack value ;
+        Stack.push state.stack value ;
+        (* printf "STACK SIZE %d \n" (Stack.length state.stack) ; *)
+        incriment_ip state
+    | None -> raise (RuntimeError "stack is empty") )
+  | Swap -> (
+      let a = Stack.pop state.stack in
+      let b = Stack.pop state.stack in
+      match (a, b) with
+      | Some a, Some b ->
+          (* printf "SWAP %d %d\n" a b ; *)
+          Stack.push state.stack a ;
+          Stack.push state.stack b ;
+          incriment_ip state
+      | _ -> raise (RuntimeError "stack is empty") )
+  | Discard -> (
+    match Stack.pop state.stack with
+    | Some _ ->
+        (* printf "DISCARD %d\n" value ; *)
+        incriment_ip state
+    | None -> raise (RuntimeError "stack is empty") )
+
+(* Execute an Arithmetic command and return the new state *)
+let exec_arithmetic command state =
+  let a = Stack.pop state.stack in
+  let b = Stack.pop state.stack in
+  match (a, b) with
+  | Some a, Some b -> (
+    match command with
+    | Addtion ->
+        (* printf "exec_arithmetic: %d + %d\n" a b; *)
+        Stack.push state.stack (a + b) ;
+        incriment_ip state
+    | Subtraction ->
+        (* printf "exec_arithmetic: %d - %d\n" a b; *)
+        Stack.push state.stack (a - b) ;
+        incriment_ip state
+    | Multiplication ->
+        (* printf "exec_arithmetic: %d * %d\n" a b; *)
+        Stack.push state.stack (a * b) ;
+        incriment_ip state
+    | Division ->
+        (* printf "exec_arithmetic: %d / %d\n" a b; *)
+        Stack.push state.stack (a / b) ;
+        incriment_ip state
+    | Modulo ->
+        (* printf "exec_arithmetic: %d %% %d\n" a b; *)
+        Stack.push state.stack (a % b) ;
+        incriment_ip state )
+  | _ -> raise (RuntimeError "expected a stack size of at least 2")
+
+(* Execute a HeapAccess command and return the new state *)
+let exec_heap_access command state =
+  (* print_endline "exec_heap_access" ; *)
+  let a = Stack.pop state.stack in
+  match a with
+  | Some _ -> (
+    match command with
+    | Store -> incriment_ip state
+    | Retrieve -> incriment_ip state )
+  | _ -> raise (RuntimeError "expected a stack size of at least 2")
+
+(* Execute a FlowControl command and return the new state *)
+let exec_flow_control command state =
+  print_endline "exec_flow_control" ;
+  match command with
+  | Mark _ -> incriment_ip state
+  | Call label ->
+      print_endline "Call" ;
+      Stack.push state.stack state.ip ;
+      update_ip state label
+  | UnconditionalJump label ->
+      printf "UnconditionalJump: %d\n" label ;
+      update_ip state label
+  | JumpZero label -> (
+      printf "MAYBE JumpZero: %d\n" label ;
+      match Stack.pop state.stack with
+      | Some value ->
+          printf "JumpZero if: %d == 0\n" value ;
+          if value = 0 then update_ip state label else incriment_ip state
+      | None -> raise (RuntimeError "expected a value") )
+  | JumpNegative _ ->
+      print_endline "JumpNegative" ;
+      incriment_ip state
+  | EndSubroutine ->
+      print_endline "EndSubroutine" ;
+      incriment_ip state
+  | EndProgram -> raise (RuntimeError "end of program")
+
+(* Execute an IO command and return the new state *)
+let exec_io command state =
+  (*print_endline "exec_io";*)
+  match command with
+  | OutputCharacter -> (
+    (*print_endline "OutputCharacter";*)
+    match Stack.pop state.stack with
+    | Some value ->
+        printf "%c" (Char.unsafe_of_int value) ;
+        incriment_ip state
+    | None -> raise (RuntimeError "expected a value") )
+  | OutputNumber -> (
+    (*print_endline "OutputNumber";*)
+    match Stack.pop state.stack with
+    | Some value -> printf "%d" value ; incriment_ip state
+    | None -> raise (RuntimeError "expected a value") )
+  | ReadCharacter -> incriment_ip state
+  | ReadNumber -> (*print_endline "ReadNumber" ;*) incriment_ip state
+
+(* 2 pass label resolution *)
+let resolve_labels instructions =
+  (* Resolve IP values of each label *)
+  let rec resolve instructions n labels =
+    try
+      match List.hd_exn instructions with
+      | FlowControl command -> (
+        match command with
+        | Mark label ->
+            let _ = Hashtbl.add labels ~key:label ~data:n in
+            resolve (List.tl_exn instructions) (n + 1) labels
+        | _ -> resolve (List.tl_exn instructions) (n + 1) labels )
+      | _ -> resolve (List.tl_exn instructions) (n + 1) labels
+    with Failure _ -> ()
+  in
+  (* Subsitute label targets with IP values *)
+  let apply labels instruction =
+    match instruction with
+    | StackManipulation _ -> instruction
+    | Arithmetic _ -> instruction
+    | HeapAccess _ -> instruction
+    | FlowControl command -> (
+      match command with
+      | Mark _ -> FlowControl command
+      | Call target ->
+          let dest = Hashtbl.find_exn labels target in
+          FlowControl (Call dest)
+      | UnconditionalJump target ->
+          let dest = Hashtbl.find_exn labels target in
+          FlowControl (UnconditionalJump dest)
+      | JumpZero target ->
+          let dest = Hashtbl.find_exn labels target in
+          FlowControl (JumpZero dest)
+      | JumpNegative target ->
+          let dest = Hashtbl.find_exn labels target in
+          FlowControl (JumpNegative dest)
+      | EndSubroutine -> FlowControl EndSubroutine
+      | EndProgram -> FlowControl EndProgram )
+    | IO command -> IO command
+  in
+  let labels = Hashtbl.create (module Int) in
+  let _ = resolve instructions 0 labels in
+  List.map instructions ~f:(apply labels)
+
+let run instructions =
+  let state = {stack= Stack.create (); heap= Buffer.create 128; ip= 0} in
+  let instructions = resolve_labels instructions in
+  let rec exec state =
+    (*printf "Instruction Pointer: %d\n" state.ip ;*)
+    match List.nth_exn instructions state.ip with
+    | StackManipulation command -> exec (exec_stack_manipulation command state)
+    | Arithmetic command -> exec (exec_arithmetic command state)
+    | HeapAccess command -> exec (exec_heap_access command state)
+    | FlowControl command -> exec (exec_flow_control command state)
+    | IO command -> exec (exec_io command state)
+  in
+  exec state
