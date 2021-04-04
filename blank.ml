@@ -8,5 +8,6 @@ let () =
   match get_filename with
   | Some filename ->
       let tokens = Parse.scan (In_channel.read_all filename) in
-      List.iter tokens ~f:(fun token -> Parse.print_token token)
+      let instructions = Parse.parse tokens in
+      Stream.iter Parse.print_imp instructions
   | None -> print_endline "usage: blank FILENAME"
