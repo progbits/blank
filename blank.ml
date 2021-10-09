@@ -1,4 +1,5 @@
 open Core
+open Lib
 
 (* Get the input filename *)
 let get_filename =
@@ -10,8 +11,8 @@ let () =
       let tokens = Parse.scan (In_channel.read_all filename) in
       let instructions = Parse.parse tokens in
       let _ =
-        match Parse.run instructions with
-        | exception Parse.EndOfProgramException _ -> exit 0
+        match Vm.run instructions with
+        | exception Vm.EndOfProgramException _ -> exit 0
         | _ -> exit 1
       in
       ()

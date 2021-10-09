@@ -1,5 +1,5 @@
 open OUnit2
-open Parse
+open Lib.Parse
 
 let rec stream_to_list stream =
   match Stream.next stream with
