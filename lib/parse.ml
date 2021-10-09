@@ -196,7 +196,7 @@ let parse tokens =
   in
   loop []
 
-exception RuntimeError of string
+exception EndOfProgramException of string
 
 (* Virtual machine state *)
 type state =
@@ -353,7 +353,7 @@ let exec_flow_control command state =
       (* printf "CALL STACK SIZE %d \n" (Stack.length state.call_stack) ; *)
       (* printf "EndSubroutine: %d\n" dest ; *)
       update_ip state dest
-  | EndProgram -> raise (RuntimeError "end of program")
+  | EndProgram -> raise (EndOfProgramException "end of program")
 
 (* Execute an IO command and return the new state *)
 let exec_io command state =

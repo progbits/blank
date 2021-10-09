@@ -9,6 +9,10 @@ let () =
   | Some filename ->
       let tokens = Parse.scan (In_channel.read_all filename) in
       let instructions = Parse.parse tokens in
-      let _ = Parse.run instructions in
+      let _ =
+        match Parse.run instructions with
+        | exception Parse.EndOfProgramException _ -> exit 0
+        | _ -> exit 1
+      in
       ()
   | None -> print_endline "usage: blank FILENAME"
