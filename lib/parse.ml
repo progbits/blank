@@ -87,13 +87,10 @@ let parse_number tokens =
   let sign =
     match Stream.next tokens with
     | Space -> 1
-    | Tab ->
-        (* print_endline "NEGATIVE NUMBER!!!"; *)
-        -1
+    | Tab -> -1
     | _ -> raise (Invalid_argument "unexpected token")
   in
   let result = sign * fst (parse tokens) in
-  (* printf "PARSED NUMBER: %d\n" result; *)
   result
 
 (* Parse a label. We can't just parse labels are numbers as e.g. [Space;
@@ -108,7 +105,6 @@ let parse_label tokens =
     | _ -> raise (Invalid_argument "unexpected token")
   in
   let result = parse tokens in
-  (* printf "PARSED LABEL: %s\n" result ; *)
   {name= result; target= 0}
 
 (* Parse Stack Manipulation Instruction Modification Parameter*)
@@ -148,25 +144,13 @@ let parse_heap_imp tokens =
 (* Parse Flow Control Instruction Modification Parameter*)
 let parse_flow_control_imp tokens =
   match (Stream.next tokens, Stream.next tokens) with
-  | Space, Space ->
-      (* print_endline "Mark" ; *)
-      Mark (parse_label tokens)
-  | Space, Tab ->
-      (* print_endline "Call" ; *)
-      Call (parse_label tokens)
-  | Space, LineFeed ->
-      (* print_endline "UnconditionalJump" ; *)
-      UnconditionalJump (parse_label tokens)
-  | Tab, Space ->
-      (* print_endline "JumpZero" ; *)
-      JumpZero (parse_label tokens)
-  | Tab, Tab ->
-      (* print_endline "JumpNegative" ; *)
-      JumpNegative (parse_label tokens)
-  | Tab, LineFeed ->
-      (* print_endline "EndSubroutine" ; *)
-      EndSubroutine
-  | LineFeed, LineFeed -> (*print_endline "EndProgram" ;*) EndProgram
+  | Space, Space -> Mark (parse_label tokens)
+  | Space, Tab -> Call (parse_label tokens)
+  | Space, LineFeed -> UnconditionalJump (parse_label tokens)
+  | Tab, Space -> JumpZero (parse_label tokens)
+  | Tab, Tab -> JumpNegative (parse_label tokens)
+  | Tab, LineFeed -> EndSubroutine
+  | LineFeed, LineFeed -> EndProgram
   | _, _ -> raise (Invalid_argument "unexpected token")
 
 (* Parse I/O Instruction Modification Parameter*)
@@ -213,16 +197,13 @@ let update_ip state ip = {state with ip}
 (* Read a single character from stdin *)
 let read_char state =
   let do_read state =
-    printf "do_read: %d\n" (String.length state.current_stdin) ;
     let first_char = String.nget state.current_stdin 0 in
-    printf "First char: %c\n" first_char ;
     let remaining_chars =
       match String.length state.current_stdin with
       | 0 -> ""
       | _ ->
           String.slice state.current_stdin 1 (String.length state.current_stdin)
     in
-    printf "Remaining char: %s\n" remaining_chars ;
     (first_char, {state with current_stdin= remaining_chars})
   in
   match String.length state.current_stdin with
@@ -233,173 +214,110 @@ let read_char state =
 
 (* Execute a StackManipulation command and return the new state *)
 let exec_stack_manipulation command state =
-  (* print_endline "exec_stack_manipulation" ; *)
-  (* printf "\tSTACK SIZE %d \n" (Stack.length state.stack) ; *)
   match command with
   | Push value ->
-      (* printf "\tPUSH %d \n" value ; *)
       Stack.push state.stack value ;
-      (* printf "\tSTACK SIZE %d \n" (Stack.length state.stack) ; *)
       incriment_ip state
   | Duplicate ->
-      (* printf "\tDUPLICATE\n" ; *)
       let value = Stack.pop_exn state.stack in
       Stack.push state.stack value ;
       Stack.push state.stack value ;
-      (* printf "\tSTACK SIZE %d \n" (Stack.length state.stack) ; *)
       incriment_ip state
   | Swap ->
       let a = Stack.pop_exn state.stack in
       let b = Stack.pop_exn state.stack in
-      (* printf "\tSWAP %d %d\n" a b ; *)
-      Stack.push state.stack a ;
-      Stack.push state.stack b ;
-      (* printf "\tSTACK SIZE %d \n" (Stack.length state.stack) ; *)
-      incriment_ip state
+      Stack.push state.stack a ; Stack.push state.stack b ; incriment_ip state
   | Discard ->
       let _ = Stack.pop_exn state.stack in
-      (* printf "\tDISCARD %d \n" value ; *)
-      (* printf "\tSTACK SIZE %d \n" (Stack.length state.stack) ; *)
       incriment_ip state
 
 (* Execute an Arithmetic command and return the new state *)
 let exec_arithmetic command state =
-  (* print_endline "exec_arithmetic" ; *)
-  (* printf "\tSTACK SIZE %d \n" (Stack.length state.stack) ; *)
   let right = Stack.pop_exn state.stack in
   let left = Stack.pop_exn state.stack in
   match command with
   | Addtion ->
-      (* printf "\tADDITION: %d + %d\n" left right ; *)
       Stack.push state.stack (left + right) ;
-      (* printf "\tSTACK SIZE %d \n" (Stack.length state.stack) ; *)
       incriment_ip state
   | Subtraction ->
-      (* printf "\tSUBTRACTION: %d - %d\n" left right ; *)
       Stack.push state.stack (left - right) ;
-      (* printf "\tSTACK SIZE %d \n" (Stack.length state.stack) ; *)
       incriment_ip state
   | Multiplication ->
-      (* printf "\tMULTIPLICATION: %d * %d\n" left right ; *)
       Stack.push state.stack (left * right) ;
-      (* printf "\tSTACK SIZE %d \n" (Stack.length state.stack) ; *)
       incriment_ip state
   | Division ->
-      (* printf "\tDIVISION: %d / %d\n" left right ; *)
       Stack.push state.stack (left / right) ;
-      (* printf "\tSTACK SIZE %d \n" (Stack.length state.stack) ; *)
       incriment_ip state
   | Modulo ->
-      (* printf "\tMODULO: %d %% %d = %d\n" left right (left % right) ; *)
       Stack.push state.stack (left % right) ;
-      (* printf "\tSTACK SIZE %d \n" (Stack.length state.stack) ; *)
       incriment_ip state
 
 (* Execute a HeapAccess command and return the new state *)
 let exec_heap_access command state =
-  (* print_endline "exec_heap_access" ; *)
   match command with
   | Store ->
       let value = Stack.pop_exn state.stack in
       let address = Stack.pop_exn state.stack in
-      (* printf "STORE %d at %d\n" value address ; *)
-      (* printf "STACK SIZE %d \n" (Stack.length state.stack) ; *)
       let _ = Hashtbl.set state.heap ~key:address ~data:value in
       incriment_ip state
   | Retrieve ->
       let address = Stack.pop_exn state.stack in
       let value = Hashtbl.find_exn state.heap address in
-      (* printf "RETRIEVED %d from %d\n" value address ; *)
-      (* printf "STACK SIZE %d \n" (Stack.length state.stack) ; *)
       let _ = Stack.push state.stack value in
       incriment_ip state
 
 (* Execute a FlowControl command and return the new state *)
 let exec_flow_control command state =
-  (* print_endline "exec_flow_control" ; *)
   match command with
-  | Mark _ ->
-      (* printf "Mark: %s\n" label.name ; *)
-      (* printf "STACK SIZE %d \n" (Stack.length state.stack) ; *)
-      incriment_ip state
+  | Mark _ -> incriment_ip state
   | Call label ->
-      (* printf "Call: %d\n" label.target ; *)
-      (* printf "CALL STACK SIZE %d \n" (Stack.length state.call_stack) ; *)
       Stack.push state.call_stack (state.ip + 1) ;
-      (* printf "CALL STACK SIZE %d \n" (Stack.length state.call_stack) ; *)
       update_ip state label.target
-  | UnconditionalJump label ->
-      (* printf "UnconditionalJump: %d\n" label.target ; *)
-      (* printf "STACK SIZE %d \n" (Stack.length state.stack) ; *)
-      update_ip state label.target
+  | UnconditionalJump label -> update_ip state label.target
   | JumpZero label ->
-      (* printf "MAYBE JumpZero: %d\n" label.target ; *)
-      (* printf "STACK SIZE %d \n" (Stack.length state.stack) ; *)
       let value = Stack.pop_exn state.stack in
-      (* printf "JumpZero if: %d == 0\n" value ; *)
-      (* printf "STACK SIZE %d \n" (Stack.length state.stack) ; *)
       if value = 0 then update_ip state label.target else incriment_ip state
   | JumpNegative label ->
-      (* printf "MAYBE JumpNegative: %d\n" label.target ; *)
-      (* printf "STACK SIZE %d \n" (Stack.length state.stack) ; *)
       let value = Stack.pop_exn state.stack in
-      (* printf "JumpNegative if: %d < 0\n" value ; *)
-      (* printf "STACK SIZE %d \n" (Stack.length state.stack) ; *)
       if value < 0 then update_ip state label.target else incriment_ip state
   | EndSubroutine ->
-      (* print_endline "EndSubroutine" ; *)
-      (* printf "CALL STACK SIZE %d \n" (Stack.length state.call_stack) ; *)
       let dest = Stack.pop_exn state.call_stack in
-      (* printf "CALL STACK SIZE %d \n" (Stack.length state.call_stack) ; *)
-      (* printf "EndSubroutine: %d\n" dest ; *)
       update_ip state dest
   | EndProgram -> raise (EndOfProgramException "end of program")
 
 (* Execute an IO command and return the new state *)
 let exec_io command state =
-  (*print_endline "exec_io";*)
   match command with
   | OutputCharacter ->
-      (* print_endline "OutputCharacter" ; *)
       let value = Stack.pop_exn state.stack in
       printf "%c%!" (Char.unsafe_of_int value) ;
       incriment_ip state
   | OutputNumber ->
-      (* print_endline "OutputNumber" ; *)
       let value = Stack.pop_exn state.stack in
       printf "%d%!" value ; incriment_ip state
   | ReadCharacter ->
-      (* print_endline "ReadCharacter" ; *)
       let value, state = read_char state in
       let address = Stack.pop_exn state.stack in
-      (* printf "STORE %d at %d\n" value address ; *)
       let _ = Hashtbl.set state.heap ~key:address ~data:(Char.to_int value) in
       incriment_ip state
   | ReadNumber ->
-      (* print_endline "ReadNumber" ; *)
       let _ = Out_channel.flush in
       let line = In_channel.input_line_exn In_channel.stdin in
       let value = int_of_string line in
       let address = Stack.pop_exn state.stack in
-      (* printf "STORE %d at %d\n" value address ; *)
       let _ = Hashtbl.set state.heap ~key:address ~data:value in
       incriment_ip state
 
 (* 2 pass label resolution *)
 let resolve_labels instructions =
-  (* printf "List.length instructions: %d\n" (List.length instructions) ; *)
   (* Resolve IP values of each label *)
   let rec resolve instructions n labels =
-    (* printf "resolve: %d\n" n ; *)
     try
       match List.hd_exn instructions with
       | FlowControl command -> (
-        (* print_endline "FlowControl" ; *)
         match command with
         | Mark label ->
-            (* print_endline "Mark" ; *)
             let _ = Hashtbl.add labels ~key:label.name ~data:n in
-            (* printf "Found Label %s at %d\n" label.name n ; *)
             resolve (List.tl_exn instructions) (n + 1) labels
         | _ -> resolve (List.tl_exn instructions) (n + 1) labels )
       | _ -> resolve (List.tl_exn instructions) (n + 1) labels
@@ -407,8 +325,6 @@ let resolve_labels instructions =
   in
   (* Subsitute label targets with IP values *)
   let apply labels instruction =
-    (* print_endline "apply" ; *)
-    (* printf "labels size: %d" (Hashtbl.length labels) ; *)
     match instruction with
     | StackManipulation _ -> instruction
     | Arithmetic _ -> instruction
@@ -444,10 +360,8 @@ let run instructions =
     ; current_stdin= ""
     ; ip= 0 }
   in
-  (* List.iter instructions ~f:print_imp ; *)
   let instructions = resolve_labels instructions in
   let rec exec state =
-    (*printf "Instruction Pointer: %d\n" state.ip ;*)
     match List.nth_exn instructions state.ip with
     | StackManipulation command -> exec (exec_stack_manipulation command state)
     | Arithmetic command -> exec (exec_arithmetic command state)
