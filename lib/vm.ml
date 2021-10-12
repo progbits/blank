@@ -29,7 +29,7 @@ let read_char state =
   in
   match String.length state.current_stdin with
   | 0 ->
-      let line = In_channel.input_line_exn In_channel.stdin in
+      let line = In_channel.input_line_exn In_channel.stdin ^ "\n" in
       do_read {state with current_stdin= line}
   | _ -> do_read state
 
